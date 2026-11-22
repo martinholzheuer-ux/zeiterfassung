@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zeiterfassung</title>
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="icon.svg" alt="" width="26" height="26"> Zeiterfassung</div>
+  <button id="syncBtn" class="syncstate" type="button" title="Jetzt synchronisieren">
+    <span class="dot"></span><span id="syncText">Sync</span>
+  </button>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="erfassen" class="active"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg><span>Erfassen</span></button>
+  <button data-tab="eintraege"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Einträge</span></button>
+  <button data-tab="abrechnen"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg><span>Abrechnen</span></button>
+  <button data-tab="projekte"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Projekte</span></button>
+  <button data-tab="einstellungen"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Einstellungen</span></button>
+</nav>
+
+<main>
+  <!-- ============================ Erfassen -->
+  <section id="tab-erfassen" class="tab active">
+    <div class="card timer" id="timerCard"></div>
+    <div class="row-between">
+      <h2>Heute <span class="muted" id="heuteSumme"></span></h2>
+      <button class="btn ghost" id="nachtragenBtn" type="button">+ Nachtragen</button>
+    </div>
+    <div id="heuteListe" class="list"></div>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <!-- ============================ Einträge -->
+  <section id="tab-eintraege" class="tab">
+    <div class="card filters">
+      <label>Von<input type="date" id="fVon"></label>
+      <label>Bis<input type="date" id="fBis"></label>
+      <label>Projekt<select id="fProjekt"></select></label>
+      <label>Status<select id="fStatus">
+        <option value="">Alle</option><option value="offen">Nicht abgerechnet</option><option value="abgerechnet">Abgerechnet</option>
+      </select></label>
+    </div>
+    <div class="row-between">
+      <h2>Einträge <span class="muted" id="eintraegeSumme"></span></h2>
+      <button class="btn ghost" id="csvBtn" type="button">CSV-Export</button>
+    </div>
+    <div id="eintraegeListe" class="list"></div>
+  </section>
+
+  <!-- ============================ Abrechnen -->
+  <section id="tab-abrechnen" class="tab">
+    <div id="bhHinweis"></div>
+    <div class="card filters">
+      <label class="wide">Kunde<select id="aKunde"></select></label>
+      <label>Von<input type="date" id="aVon"></label>
+      <label>Bis<input type="date" id="aBis"></label>
+      <label>Positionen<select id="aGruppe">
+        <option value="einzeln">Je Eintrag</option>
+        <option value="tag">Je Tag und Projekt</option>
+        <option value="projekt">Je Projekt (Summe)</option>
+      </select></label>
+      <label>Rundung<select id="aRundung">
+        <option value="exakt">Minutengenau (empfohlen)</option>
+        <option value="kaufm">Kaufmännisch auf Takt</option>
+        <option value="ab">Abrunden auf Takt</option>
+        <option value="auf">Aufrunden auf Takt (nur mit Einzelvereinbarung)</option>
+      </select></label>
+      <label>Takt<select id="aTakt">
+        <option value="5">5 Minuten</option><option value="6">6 Minuten (0,1 h)</option>
+        <option value="10">10 Minuten</option><option value="15">15 Minuten</option><option value="30">30 Minuten</option>
+      </select></label>
+    </div>
+    <div id="aRundHinweis"></div>
+    <details class="info" id="rechtInfo">
+      <summary>ⓘ Rundung und Rechtsprechung zum Zeithonorar</summary>
+      <div class="body">
+        <ul>
+          <li><b>BGH, Urt. v. 13.02.2020 – IX ZR 140/19:</b> Eine formularmäßige 15-Minuten-Zeittaktklausel (jede angefangene Viertelstunde wird voll berechnet) ist gegenüber Verbrauchern nach § 307 BGB unwirksam. Das vereinbarte Stundenhonorar bleibt bestehen, abgerechnet wird dann minutengenau. Welcher kürzere Takt noch zulässig ist, hat der BGH offengelassen.</li>
+          <li><b>OLG Düsseldorf, Urt. v. 13.01.2026 – 24 U 65/22:</b> Die 15-Minuten-Klausel in AGB ist <i>auch gegenüber Unternehmen</i> (B2B) unwirksam. Folge: minutengenaue Abrechnung.</li>
+          <li><b>OLG München, Urt. v. 05.06.2019 – 15 U 318/18</b> (Vorinstanz zum BGH): Ein 6-Minuten-Takt sei „(noch) akzeptabel“. Das ist nicht höchstrichterlich bestätigt.</li>
+          <li><b>BGH, Urt. v. 17.04.2009 – VII ZR 164/07:</b> Für die Vergütung nach Zeitaufwand genügt grundsätzlich die Angabe der angefallenen Stunden. Kann der Kunde die Leistungen nicht nachvollziehen, müssen sie konkret erläutert werden (sekundäre Darlegungslast). Deshalb übernimmt die App die Tätigkeitstexte in die Positionen.</li>
+        </ul>
+        <p><b>Empfehlung:</b> Minutengenau abrechnen. Aufrunden auf einen Takt nur, wenn es mit dem Kunden einzeln (nicht per AGB) vereinbart ist. Abrunden ist zugunsten des Kunden immer unproblematisch. Die Rundung wirkt je Rechnungsposition, nicht je Eintrag.</p>
+        <p class="hint">Stand: November 2026. Die Urteile betreffen Anwalts- und Beraterhonorare; die Übertragbarkeit auf andere Branchen ist im Einzelfall zu prüfen. Keine Rechtsberatung.</p>
+      </div>
+    </details>
+    <h2>Offene Zeiten</h2>
+    <div id="aEintraege" class="list"></div>
+    <h2>Rechnungspositionen</h2>
+    <div id="aVorschau"></div>
+    <div class="actions">
+      <button class="btn primary" id="aSenden" type="button">Rechnungsentwurf in Buchhaltung anlegen</button>
+    </div>
+    <div id="aErgebnis"></div>
+    <div class="row-between">
+      <h2>Übertragene Rechnungen</h2>
+      <button class="btn ghost" id="aStatusBtn" type="button">Status abrufen</button>
+    </div>
+    <div id="aRechnungen" class="list"></div>
+  </section>
+
+  <!-- ============================ Projekte -->
+  <section id="tab-projekte" class="tab">
+    <div class="row-between">
+      <h2>Projekte</h2>
+      <button class="btn primary" id="projektNeuBtn" type="button">+ Neues Projekt</button>
+    </div>
+    <div id="projektListe" class="list"></div>
+  </section>
+
+  <!-- ============================ Einstellungen -->
+  <section id="tab-einstellungen" class="tab">
+    <form class="card form" id="formAllg">
+      <h3>Gerät</h3>
+      <label>Gerätename<input name="geraet_name" placeholder="z. B. PC Büro, Handy"></label>
+      <p class="hint">Jedes Gerät speichert seine Daten in einer eigenen Datei. So entstehen keine Sync-Konflikte.</p>
+    </form>
+
+    <form class="card form" id="formSync">
+      <h3>Synchronisation</h3>
+      <label>Art<select name="modus">
+        <option value="auto">Automatisch</option>
+        <option value="lokal">Lokaler Nextcloud-Ordner (PC-Starter)</option>
+        <option value="webdav">Nextcloud direkt (WebDAV)</option>
+        <option value="aus">Aus</option>
+      </select></label>
+      <div class="webdav">
+        <label>Nextcloud-Adresse<input name="url" type="url" placeholder="https://meine-cloud.example.de" autocomplete="off"></label>
+        <label>Benutzername<input name="user" autocomplete="username"></label>
+        <label>App-Passwort<input name="pass" type="password" autocomplete="current-password" placeholder="Nextcloud → Einstellungen → Sicherheit → App-Passwort"></label>
+      </div>
+      <label>Ordner in der Nextcloud<input name="ordner" placeholder="Zeiterfassung-Daten"></label>
+      <div class="actions"><button class="btn" type="button" id="syncTestBtn">Verbindung testen</button></div>
+      <p class="hint" id="syncInfo"></p>
+    </form>
+
+    <form class="card form" id="formBh">
+      <h3>Buchhaltung</h3>
+      <label>Adresse<input name="url" placeholder="http://127.0.0.1:5000"></label>
+      <label>API-Schlüssel<input name="token" type="password" autocomplete="off" placeholder="bh_…"></label>
+      <p class="hint">Den Schlüssel erzeugst du in der Buchhaltung unter Einstellungen → Schnittstelle (API). Die Buchhaltung ist nur an diesem PC erreichbar. Auf dem Handy erfasst du Zeiten, abgerechnet wird am PC.</p>
+      <div class="actions"><button class="btn" type="button" id="bhTestBtn">Verbinden &amp; Kunden laden</button></div>
+      <p class="hint" id="bhInfo"></p>
+    </form>
+
+    <div class="card form">
+      <h3>Daten</h3>
+      <div class="actions">
+        <button class="btn" type="button" id="backupBtn">Sicherung herunterladen (JSON)</button>
+        <label class="btn">Sicherung einlesen<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+      </div>
+      <p class="hint" id="datenInfo"></p>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" id="dlgForm" class="form"></form>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
