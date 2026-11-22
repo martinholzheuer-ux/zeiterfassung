@@ -144,11 +144,22 @@ function webdavAdapter(c) {
   const base = ncUrl(c.url) + '/remote.php/dav/files/' + encodeURIComponent(c.user) + '/' +
     (c.ordner || 'Zeiterfassung-Daten').split('/').filter(Boolean).map(encodeURIComponent).join('/') + '/';
   const auth = 'Basic ' + btoa(unescape(encodeURIComponent(c.user + ':' + c.pass)));
+  // Fehlermeldungen nennen Schritt, Adresse und Grund – damit sich Probleme aus der Ferne eingrenzen lassen
+  const wo = (method, url) => `${method} ${url.replace(/^https?:\/\//, '')}`;
   const req = async (method, url, opt = {}) => {
     let r;
     try { r = await fetch(url, { method, cache: 'no-store', ...opt, headers: { Authorization: auth, ...(opt.headers || {}) } }); }
-    catch { throw new Error('Nextcloud nicht erreichbar. Ist der Browser-Zugriff (CORS) für diese App erlaubt? Siehe README.'); }
-    if (r.status === 401) throw new Error('Nextcloud: Benutzername oder App-Passwort falsch.');
+    catch (e) {
+      throw new Error(`Nextcloud nicht erreichbar (${wo(method, url)}: ${e.message}). ` +
+        (navigator.onLine ? 'Ist die Adresse richtig und der Browser-Zugriff (CORS) für diese App erlaubt?' : 'Das Gerät ist offline.'));
+    }
+    if (r.status === 401) throw new Error(`Nextcloud: Benutzername oder App-Passwort falsch (${wo(method, url)}).`);
+    if (!r.ok && !(method === 'PROPFIND' && r.status === 404)) {
+      const hinweis = { 404: 'Benutzername stimmt nicht? Es muss der Anmeldename sein, nicht die E-Mail-Adresse.',
+        405: 'Adresse falsch oder Ordnername ist eine Datei?', 409: 'Übergeordneter Ordner fehlt – Benutzername prüfen.',
+        423: 'Datei ist in der Nextcloud gesperrt.', 507: 'Nextcloud-Speicher voll.' }[r.status] || '';
+      throw new Error(`Nextcloud-Fehler ${r.status} bei ${wo(method, url)}. ${hinweis}`);
+    }
     return r;
   };
   return {
