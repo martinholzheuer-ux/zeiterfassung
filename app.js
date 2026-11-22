@@ -9,7 +9,7 @@
  * Rechnungs-Entwurf in der Buchhaltung angelegt (POST /api/rechnungen).
  */
 'use strict';
-const APP_VERSION = '6';   // zusammen mit VERSION in sw.js erhöhen
+const APP_VERSION = '7';   // zusammen mit VERSION in sw.js erhöhen
 const APP_STAND = '22.11.2026';
 
 // ------------------------------------------------------------------ Hilfen

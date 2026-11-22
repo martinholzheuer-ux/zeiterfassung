@@ -101,6 +101,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .form .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 10px; }
 .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0 10px; padding-bottom: 6px; }
 .filters .wide { grid-column: 1 / -1; }
+.form label.btn { font-size: 15px; color: var(--text); margin: 0; }
 .check { display: flex !important; align-items: center; gap: 8px; color: var(--text) !important; }
 .check input { width: 18px; min-height: 18px; margin: 0 !important; }
 
