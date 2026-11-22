@@ -9,6 +9,7 @@
  * Rechnungs-Entwurf in der Buchhaltung angelegt (POST /api/rechnungen).
  */
 'use strict';
+const APP_VERSION = '5';   // zusammen mit VERSION in sw.js erhöhen
 
 // ------------------------------------------------------------------ Hilfen
 const $ = (s, el = document) => el.querySelector(s);
@@ -801,7 +802,7 @@ function renderEinstellungen() {
     ? (LOKAL ? 'Automatisch: Am PC wird über den lokalen Nextcloud-Ordner synchronisiert. ' : 'Automatisch: Nextcloud direkt, sobald die Zugangsdaten eingetragen sind. ')
     : '') + (cfg.letzteSync ? 'Letzter Abgleich: ' + new Date(cfg.letzteSync).toLocaleString('de-DE') + '.' : 'Noch nicht synchronisiert.');
   const n = { p: lebend(S.projekte).length, e: eintraege().length, k: lebend(S.kunden).length };
-  $('#datenInfo').textContent = `${n.e} Einträge, ${n.p} Projekte, ${n.k} Kunden aus der Buchhaltung · Geräte-ID ${cfg.geraet_id.slice(0, 8)}`;
+  $('#datenInfo').textContent = `${n.e} Einträge, ${n.p} Projekte, ${n.k} Kunden aus der Buchhaltung · Geräte-ID ${cfg.geraet_id.slice(0, 8)} · App-Version ${APP_VERSION}`;
 }
 $('#formAllg').addEventListener('change', e => { cfg.geraet_name = e.currentTarget.geraet_name.value.trim() || cfg.geraet_name; saveCfg(); planeSync(); });
 $('#formSync').addEventListener('change', e => {
@@ -865,5 +866,13 @@ sync();
 if (LOKAL && cfg.bh.token) kundenLaden().catch(() => {});
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || LOKAL)) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Übernimmt ein neuer Service Worker (Update), Seite einmal neu laden – dann läuft sofort die neue Version
+  const hatteController = !!navigator.serviceWorker.controller;
+  let neuGeladen = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hatteController && !neuGeladen && !$('#dlg').open) { neuGeladen = true; location.reload(); }
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  }).catch(() => {});
 }
