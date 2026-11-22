@@ -109,6 +109,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .zeitfeld { display: grid; grid-template-columns: auto 1fr auto auto; gap: 6px; margin-top: 4px; }
 .zeitfeld input { margin: 0 !important; text-align: center; font-size: 18px !important; font-variant-numeric: tabular-nums; }
 .zeitfeld .btn { min-height: 40px; padding: 6px 10px; font-size: 14px; }
+.autohinweis { border-width: 2px; background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
+.autohinweis .actions { margin-top: 10px; }
 .form label.btn { font-size: 15px; color: var(--text); margin: 0; }
 .check { display: flex !important; align-items: center; gap: 8px; color: var(--text) !important; }
 .check input { width: 18px; min-height: 18px; margin: 0 !important; }

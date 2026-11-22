@@ -9,7 +9,7 @@
  * Rechnungs-Entwurf in der Buchhaltung angelegt (POST /api/rechnungen).
  */
 'use strict';
-const APP_VERSION = '9';   // zusammen mit VERSION in sw.js erhöhen
+const APP_VERSION = '10';   // zusammen mit VERSION in sw.js erhöhen
 const APP_STAND = '22.11.2026';
 
 // ------------------------------------------------------------------ Hilfen
@@ -239,7 +239,7 @@ async function sync() {
     cfg.letzteSync = Date.now(); saveCfg();
     syncAnzeige('ok', 'Synchron');
     $('#syncBtn').title = `${a.name} · zuletzt ${new Date().toLocaleTimeString('de-DE')} · ${dateien.length} Gerätedatei(en)`;
-    if (geaendert) render();
+    if (geaendert && !autoBeenden()) render();   // ein anderes Gerät kann einen über Mitternacht laufenden Timer geliefert haben
   } catch (e) {
     syncAnzeige('err', 'Sync-Fehler'); $('#syncBtn').title = e.message;
   } finally {
@@ -295,7 +295,52 @@ $('#tabs').addEventListener('click', e => { const b = e.target.closest('button')
 function render() {
   ({ erfassen: renderErfassen, eintraege: renderEintraege, abrechnen: renderAbrechnen,
      projekte: renderProjekte, einstellungen: renderEinstellungen })[aktiverTab]();
+  renderAutoHinweis();
 }
+
+// ------------------------------------------------------------------ Automatisch um 24 Uhr beenden
+// Ein vergessener Timer läuft höchstens bis Mitternacht des Starttags. Die Zeit wird dann mit Ende 24:00
+// gespeichert und oben in der App so lange angezeigt, bis sie bestätigt oder korrigiert wurde.
+function mitternachtNach(startIso) { const d = new Date(startIso); d.setHours(24, 0, 0, 0); return d; }
+const endeText = e => !e.ende ? '…' :
+  e.ende.slice(11, 16) === '00:00' && e.ende.slice(0, 10) !== e.start.slice(0, 10) ? '24:00' : zeit(e.ende);
+
+function autoBeenden() {
+  const l = laufend();
+  if (!l) return false;
+  const mn = mitternachtNach(l.start);
+  if (new Date() < mn) return false;
+  const e = { ...l, ende: isoLocal(mn), auto_beendet: true, auto_gesehen: false };
+  if (e.pause_seit) {   // lief eine Pause über Mitternacht, zählt sie bis 24:00
+    e.pause = Math.round(((Number(e.pause) || 0) + laufendePauseMin(e, mn)) * 100) / 100;
+    e.pause_seit = null;
+  }
+  upsert('eintraege', e);
+  speichern(true);
+  toast('⚠ Zeit wurde automatisch um 24:00 beendet – bitte prüfen.');
+  return true;
+}
+
+function renderAutoHinweis() {
+  const offen = eintraege().filter(e => e.auto_beendet && !e.auto_gesehen && e.ende).sort((a, b) => a.start.localeCompare(b.start));
+  $('#autoHinweis').innerHTML = offen.map(e => {
+    const p = projekt(e.projekt_id);
+    return `<div class="notice warn autohinweis">
+      <b>⚠ Zeit automatisch um 24:00 Uhr beendet</b><br>
+      ${esc(p?.name || 'Ohne Projekt')}${p?.kunde ? ' · ' + esc(p.kunde) : ''} am ${WOCHENTAG[new Date(e.start).getDay()]}, ${dDE(e.start.slice(0, 10))}: ${zeit(e.start)}–24:00 Uhr (${stdFmt(dauerMin(e))}).
+      Der Timer lief über Mitternacht und wurde nicht gestoppt. Stimmt die Endzeit nicht, bitte korrigieren, bevor du abrechnest.
+      <div class="actions">
+        <button class="btn primary" type="button" data-auto-korr="${esc(e.id)}">Endzeit korrigieren</button>
+        <button class="btn" type="button" data-auto-ok="${esc(e.id)}">Stimmt so</button>
+      </div></div>`;
+  }).join('');
+  $$('[data-auto-korr]').forEach(b => b.addEventListener('click', () => eintragDialog(S.eintraege.find(x => x.id === b.dataset.autoKorr))));
+  $$('[data-auto-ok]').forEach(b => b.addEventListener('click', () => {
+    const e = S.eintraege.find(x => x.id === b.dataset.autoOk);
+    if (e) { upsert('eintraege', { ...e, auto_gesehen: true }); speichern(true); }
+  }));
+}
+setInterval(autoBeenden, 15e3);
 
 // ------------------------------------------------------------------ Erfassen
 function projektOptionen(sel, mitLeer = false, nurAktiv = true) {
@@ -397,11 +442,12 @@ setInterval(tick, 1000);
 
 function eintragItem(e) {
   const p = projekt(e.projekt_id);
-  const status = e.rechnung ? `<span class="badge ok">${esc(e.rechnung.nummer || 'Rechnung #' + e.rechnung.id)}</span>` : (e.ende ? '' : '<span class="badge accent">läuft</span>');
+  const status = (e.rechnung ? `<span class="badge ok">${esc(e.rechnung.nummer || 'Rechnung #' + e.rechnung.id)}</span>` : (e.ende ? '' : '<span class="badge accent">läuft</span>')) +
+    (e.auto_beendet ? ' <span class="badge warn" title="Automatisch um 24:00 Uhr beendet">autom. 24:00</span>' : '');
   return `<button class="item" type="button" data-eintrag="${esc(e.id)}">
     <span class="swatch" style="background:${farbe(p)}"></span>
     <span class="main"><span class="title">${esc(e.text || p?.name || 'Ohne Projekt')}</span>
-      <span class="meta">${esc(p?.name || 'Ohne Projekt')}${p?.kunde ? ' · ' + esc(p.kunde) : ''} · ${zeit(e.start)}–${e.ende ? zeit(e.ende) : '…'}${e.pause ? ` · ${e.pause} min Pause` : ''} ${status}</span></span>
+      <span class="meta">${esc(p?.name || 'Ohne Projekt')}${p?.kunde ? ' · ' + esc(p.kunde) : ''} · ${zeit(e.start)}–${endeText(e)}${e.pause ? ` · ${e.pause} min Pause` : ''} ${status}</span></span>
     <span class="right"><b>${stdFmt(dauerMin(e))}</b><span class="meta">${p?.satz ? eur(dauerMin(e) / 60 * p.satz) : ''}</span></span>
   </button>`;
 }
@@ -518,7 +564,8 @@ function eintragDialog(e) {
     } else if (e.ende || neu) { alert('Bitte eine Endzeit angeben.'); return false; }
     if (!ende && laufend() && laufend().id !== e.id) { alert('Es läuft bereits eine andere Zeit.'); return false; }
     lsSet('ze_letztes_projekt', fd.get('projekt_id'));
-    upsert('eintraege', { ...e, projekt_id: fd.get('projekt_id'), text: fd.get('text').trim(), start, ende, pause: Math.max(0, parseInt(fd.get('pause')) || 0) });
+    upsert('eintraege', { ...e, projekt_id: fd.get('projekt_id'), text: fd.get('text').trim(), start, ende, pause: Math.max(0, parseInt(fd.get('pause')) || 0),
+      ...(e.auto_beendet ? { auto_gesehen: true } : {}) });   // geprüft/korrigiert -> Hinweis ausblenden
     speichern(true);
   },
   form => {
@@ -621,7 +668,7 @@ $('#csvBtn').addEventListener('click', () => {
   const zeilen = [['Datum', 'Von', 'Bis', 'Pause (Min.)', 'Dauer (h)', 'Projekt', 'Kunde', 'Tätigkeit', 'Stundensatz', 'Betrag netto', 'Rechnung']];
   for (const e of gefilterteEintraege().reverse()) {
     const p = projekt(e.projekt_id), h = dauerMin(e) / 60;
-    zeilen.push([dDE(e.start.slice(0, 10)), zeit(e.start), zeit(e.ende), e.pause || 0, h.toFixed(2).replace('.', ','), p?.name || '', p?.kunde || '',
+    zeilen.push([dDE(e.start.slice(0, 10)), zeit(e.start), endeText(e), e.pause || 0, h.toFixed(2).replace('.', ','), p?.name || '', p?.kunde || '',
       e.text || '', p?.satz ? String(p.satz).replace('.', ',') : '', p?.satz ? (h * p.satz).toFixed(2).replace('.', ',') : '', e.rechnung ? (e.rechnung.nummer || '#' + e.rechnung.id) : '']);
   }
   const csv = '﻿' + zeilen.map(z => z.map(v => /[;"\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v).join(';')).join('\r\n');
@@ -708,7 +755,7 @@ function renderAbrechnen() {
     <thead><tr><th><input type="checkbox" id="aAlle" ${im.every(e => !abwahl.has(e.id)) ? 'checked' : ''} aria-label="Alle"></th><th>Datum</th><th>Projekt / Tätigkeit</th><th class="r">Dauer</th></tr></thead>
     <tbody>${im.map(e => { const p = projekt(e.projekt_id); return `<tr>
       <td><input type="checkbox" data-wahl="${esc(e.id)}" ${abwahl.has(e.id) ? '' : 'checked'}></td>
-      <td class="num">${dDE(e.start.slice(0, 10))}<div class="hint">${zeit(e.start)}–${zeit(e.ende)}</div></td>
+      <td class="num">${dDE(e.start.slice(0, 10))}<div class="hint">${zeit(e.start)}–${endeText(e)}</div></td>
       <td>${esc(p.name)}<div class="hint">${esc(e.text || '')}</div></td>
       <td class="r">${stdFmt(dauerMin(e))}</td></tr>`; }).join('')}</tbody></table></div>`
     : '<div class="empty">Keine offenen Zeiten für diese Auswahl.</div>';
@@ -935,6 +982,7 @@ window.addEventListener('storage', ev => {        // zweites Fenster/Tab im selb
 setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 60e3);
 
 initFilter();
+autoBeenden();   // App war über Mitternacht geschlossen
 zeigeTab((() => {
   const h = location.hash.slice(1);
   if ($('#tab-' + h)) { history.replaceState(null, '', location.pathname); return h; }   // z. B. App-Verknüpfung „Abrechnen“
