@@ -1,6 +1,6 @@
 // Service Worker: hält die App-Dateien offline verfügbar. Sync- und API-Aufrufe gehen immer ins Netz.
 // Bei jeder Änderung an den App-Dateien VERSION erhöhen (und APP_VERSION in app.js) – sonst bleiben Geräte auf dem alten Stand.
-const VERSION = '8';
+const VERSION = '9';
 const CACHE = 'zeiterfassung-v' + VERSION;
 const DATEIEN = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 

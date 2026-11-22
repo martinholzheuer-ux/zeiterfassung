@@ -9,7 +9,7 @@
  * Rechnungs-Entwurf in der Buchhaltung angelegt (POST /api/rechnungen).
  */
 'use strict';
-const APP_VERSION = '8';   // zusammen mit VERSION in sw.js erhöhen
+const APP_VERSION = '9';   // zusammen mit VERSION in sw.js erhöhen
 const APP_STAND = '22.11.2026';
 
 // ------------------------------------------------------------------ Hilfen
@@ -429,6 +429,46 @@ function dialog(html, onSubmit, onReady) {
   dlg.showModal();
 }
 
+/* Uhrzeit-Eingabe ohne die Zeitauswahl des Betriebssystems (deren „Festlegen“-Knopf ist auf manchen
+ * Android-Geräten abgeschnitten): Textfeld mit Zifferntastatur plus Knöpfe −15 / +15 / Jetzt.
+ * Akzeptiert 8, 830, 0830, 8:30, 8.30, 8,30 und 8 30. */
+function parseZeit(s) {
+  s = String(s || '').trim();
+  if (!s) return null;
+  let h, m;
+  const teile = s.match(/^(\d{1,2})\s*[:.,h ]\s*(\d{1,2})$/);
+  if (teile) { h = +teile[1]; m = +teile[2]; }
+  else if (/^\d{1,2}$/.test(s)) { h = +s; m = 0; }                                   // 8 → 08:00
+  else if (/^\d{3,4}$/.test(s)) { const z = s.padStart(4, '0'); h = +z.slice(0, 2); m = +z.slice(2); }   // 830 → 08:30
+  else return null;
+  return h < 24 && m < 60 ? `${pad(h)}:${pad(m)}` : null;
+}
+function zeitFeld(name, label, wert, pflicht) {
+  // bewusst kein <label> um die Knöpfe: ein Tipp auf die Beschriftung würde sonst „−15“ auslösen
+  return `<div class="zfwrap"><label for="zf-${name}">${label}</label><span class="zeitfeld">
+    <button type="button" class="btn" data-zeit="${name}" data-delta="-15" aria-label="${label} 15 Minuten früher">−15</button>
+    <input id="zf-${name}" name="${name}" inputmode="numeric" autocomplete="off" placeholder="hh:mm" value="${esc(wert)}" ${pflicht ? 'required' : ''}>
+    <button type="button" class="btn" data-zeit="${name}" data-delta="15" aria-label="${label} 15 Minuten später">+15</button>
+    <button type="button" class="btn" data-zeit="${name}" data-jetzt aria-label="${label} auf jetzt setzen">Jetzt</button>
+  </span></div>`;
+}
+function bindZeitFelder(form) {
+  const setzen = (feld, hhmm) => { feld.value = hhmm; feld.setCustomValidity(''); feld.dispatchEvent(new Event('input', { bubbles: true })); };
+  $$('[data-zeit]', form).forEach(b => b.addEventListener('click', () => {
+    const feld = form.elements[b.dataset.zeit];
+    if ('jetzt' in b.dataset) { const d = new Date(); return setzen(feld, `${pad(d.getHours())}:${pad(d.getMinutes())}`); }
+    const alt = parseZeit(feld.value) || (feld.name === 'bis' && parseZeit(form.von.value)) || '08:00';
+    const min = (+alt.slice(0, 2) * 60 + +alt.slice(3) + +b.dataset.delta + 1440) % 1440;
+    setzen(feld, `${pad(Math.floor(min / 60))}:${pad(min % 60)}`);
+  }));
+  const pruefen = ev => {
+    const f = ev.target, z = parseZeit(f.value);
+    if (z && z !== f.value) setzen(f, z);
+    f.setCustomValidity(f.value.trim() && !z ? 'Bitte Uhrzeit wie 8:30 oder 0830 eingeben.' : '');
+  };
+  ['von', 'bis'].forEach(n => { form.elements[n].addEventListener('change', pruefen); form.elements[n].addEventListener('blur', pruefen); });
+}
+
 function eintragDialog(e) {
   const neu = !e;
   if (neu) {
@@ -445,9 +485,9 @@ function eintragDialog(e) {
       <div class="grid2">
         <label>Datum<input type="date" name="datum" value="${e.start.slice(0, 10)}" required></label>
         <label>Pause (Min.)<input type="number" name="pause" min="0" step="1" value="${Math.round(Number(e.pause) || 0)}"></label>
-        <label>Von<input type="time" name="von" value="${zeit(e.start)}" required></label>
-        <label>Bis<input type="time" name="bis" value="${e.ende ? zeit(e.ende) : ''}" ${e.ende ? 'required' : ''} placeholder="läuft"></label>
       </div>
+      ${zeitFeld('von', 'Von', zeit(e.start), true)}
+      ${zeitFeld('bis', 'Bis', e.ende ? zeit(e.ende) : '', !!e.ende || neu)}
       <p class="hint" id="dauerHint"></p>
     </fieldset>
     <div class="actions">
@@ -466,7 +506,9 @@ function eintragDialog(e) {
       if (!confirm('Die Zuordnung zur Rechnung wird entfernt. Der Eintrag kann dann erneut abgerechnet werden. Nur verwenden, wenn die Rechnung in der Buchhaltung gelöscht oder storniert ist. Fortfahren?')) return false;
       upsert('eintraege', { ...e, rechnung: null }); speichern(true); return;
     }
-    const datum = fd.get('datum'), von = fd.get('von'), bis = fd.get('bis');
+    const datum = fd.get('datum'), von = parseZeit(fd.get('von')), bis = parseZeit(fd.get('bis'));
+    if (!von) { alert('Bitte eine gültige Startzeit eingeben (z. B. 8:30 oder 0830).'); return false; }
+    if (fd.get('bis').trim() && !bis) { alert('Bitte eine gültige Endzeit eingeben (z. B. 17:15 oder 1715).'); return false; }
     const start = `${datum}T${von}:00`;
     let ende = null;
     if (bis) {
@@ -480,8 +522,9 @@ function eintragDialog(e) {
     speichern(true);
   },
   form => {
+    bindZeitFelder(form);
     const upd = () => {
-      const v = form.von.value, b = form.bis.value;
+      const v = parseZeit(form.von.value), b = parseZeit(form.bis.value);
       if (!v || !b) { $('#dauerHint').textContent = ''; return; }
       let m = (new Date(`2000-01-01T${b}`) - new Date(`2000-01-01T${v}`)) / 60000;
       if (m < 0) m += 1440;
@@ -870,7 +913,7 @@ $('#bhTestBtn').addEventListener('click', async () => {
     $('#bhInfo').textContent = `✓ Verbunden mit „${r.firma}“: ${r.anzahl} Kunden geladen (${r.neu} neu/geändert).`;
   } catch (e) { $('#bhInfo').textContent = '✗ ' + e.message; }
 });
-$('#backupBtn').addEventListener('click', () => download(`Zeiterfassung_Sicherung_${heute()}.json`,
+$('#backupBtn').addEventListener('click', () => download(`EineUhrSieZuKnechten_Sicherung_${heute()}.json`,
   JSON.stringify({ format: 1, gespeichert: new Date().toISOString(), projekte: S.projekte, eintraege: S.eintraege, kunden: S.kunden }, null, 1), 'application/json'));
 $('#importFile').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;

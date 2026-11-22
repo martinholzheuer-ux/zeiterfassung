@@ -35,7 +35,10 @@ h3 { font-size: 15px; margin: 0 0 12px; }
   padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top));
   background: var(--surface); border-bottom: 1px solid var(--line);
 }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 16px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 16px; min-width: 0; }
+.brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand img { flex: 0 0 auto; }
+.syncstate { flex: 0 0 auto; }
 .syncstate {
   display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface-2);
   color: var(--muted); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer;
@@ -101,6 +104,11 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .form .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 10px; }
 .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0 10px; padding-bottom: 6px; }
 .filters .wide { grid-column: 1 / -1; }
+.zfwrap { margin-bottom: 10px; }
+.form .zfwrap label { margin-bottom: 0; }
+.zeitfeld { display: grid; grid-template-columns: auto 1fr auto auto; gap: 6px; margin-top: 4px; }
+.zeitfeld input { margin: 0 !important; text-align: center; font-size: 18px !important; font-variant-numeric: tabular-nums; }
+.zeitfeld .btn { min-height: 40px; padding: 6px 10px; font-size: 14px; }
 .form label.btn { font-size: 15px; color: var(--text); margin: 0; }
 .check { display: flex !important; align-items: center; gap: 8px; color: var(--text) !important; }
 .check input { width: 18px; min-height: 18px; margin: 0 !important; }

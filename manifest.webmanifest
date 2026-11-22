@@ -1,6 +1,6 @@
 {
-  "name": "Zeiterfassung",
-  "short_name": "Zeiten",
+  "name": "EineUhrSieZuKnechten",
+  "short_name": "EineUhrSieZuKnechten",
   "description": "Zeiten erfassen und direkt als Rechnungsentwurf an die Buchhaltung übergeben.",
   "lang": "de",
   "start_url": "./",
