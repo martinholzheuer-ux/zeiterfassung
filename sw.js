@@ -1,5 +1,5 @@
 // Service Worker: hält die App-Dateien offline verfügbar. Sync- und API-Aufrufe gehen immer ins Netz.
-const CACHE = 'zeiterfassung-v2';
+const CACHE = 'zeiterfassung-v3';
 const DATEIEN = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

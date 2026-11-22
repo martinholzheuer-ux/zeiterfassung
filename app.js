@@ -125,8 +125,23 @@ const lokalAdapter = {
   },
 };
 
+/* Nextcloud-Adresse vereinheitlichen: ohne https:// würde der Browser sie an die App-Adresse anhängen
+ * (GitHub antwortet dann 405), http:// blockiert der Browser auf HTTPS-Seiten. Kopierte Adressen wie
+ * …/index.php/apps/files oder …/login werden auf die Server-Adresse gekürzt. */
+function ncUrl(eingabe) {
+  let s = String(eingabe || '').trim().replace(/\s+/g, '');
+  if (!s) return '';
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  s = s.replace(/^http:\/\//i, 'https://');
+  try {
+    const u = new URL(s);
+    const pfad = u.pathname.split(/\/(?:index\.php|remote\.php|apps|login|settings|s\/)(?:\/|$)/)[0].replace(/\/+$/, '');
+    return u.origin + pfad;
+  } catch { return s.replace(/\/+$/, ''); }
+}
+
 function webdavAdapter(c) {
-  const base = c.url.replace(/\/+$/, '') + '/remote.php/dav/files/' + encodeURIComponent(c.user) + '/' +
+  const base = ncUrl(c.url) + '/remote.php/dav/files/' + encodeURIComponent(c.user) + '/' +
     (c.ordner || 'Zeiterfassung-Daten').split('/').filter(Boolean).map(encodeURIComponent).join('/') + '/';
   const auth = 'Basic ' + btoa(unescape(encodeURIComponent(c.user + ':' + c.pass)));
   const req = async (method, url, opt = {}) => {
@@ -780,7 +795,8 @@ function renderEinstellungen() {
 $('#formAllg').addEventListener('change', e => { cfg.geraet_name = e.currentTarget.geraet_name.value.trim() || cfg.geraet_name; saveCfg(); planeSync(); });
 $('#formSync').addEventListener('change', e => {
   const f = e.currentTarget;
-  Object.assign(cfg.sync, { modus: f.modus.value, url: f.url.value.trim(), user: f.user.value.trim(), pass: f.pass.value, ordner: f.ordner.value.trim() || 'Zeiterfassung-Daten' });
+  f.url.value = ncUrl(f.url.value);   // korrigierte Adresse gleich anzeigen
+  Object.assign(cfg.sync, { modus: f.modus.value, url: f.url.value, user: f.user.value.trim(), pass: f.pass.value, ordner: f.ordner.value.trim() || 'Zeiterfassung-Daten' });
   cfg.etags = {}; lokalVerfuegbar = null; saveCfg();
   $('#formSync .webdav').style.display = cfg.sync.modus === 'webdav' || (cfg.sync.modus === 'auto' && !LOKAL) ? '' : 'none';
   planeSync(300);
