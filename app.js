@@ -9,7 +9,8 @@
  * Rechnungs-Entwurf in der Buchhaltung angelegt (POST /api/rechnungen).
  */
 'use strict';
-const APP_VERSION = '5';   // zusammen mit VERSION in sw.js erhöhen
+const APP_VERSION = '6';   // zusammen mit VERSION in sw.js erhöhen
+const APP_STAND = '22.11.2026';
 
 // ------------------------------------------------------------------ Hilfen
 const $ = (s, el = document) => el.querySelector(s);
@@ -802,8 +803,42 @@ function renderEinstellungen() {
     ? (LOKAL ? 'Automatisch: Am PC wird über den lokalen Nextcloud-Ordner synchronisiert. ' : 'Automatisch: Nextcloud direkt, sobald die Zugangsdaten eingetragen sind. ')
     : '') + (cfg.letzteSync ? 'Letzter Abgleich: ' + new Date(cfg.letzteSync).toLocaleString('de-DE') + '.' : 'Noch nicht synchronisiert.');
   const n = { p: lebend(S.projekte).length, e: eintraege().length, k: lebend(S.kunden).length };
-  $('#datenInfo').textContent = `${n.e} Einträge, ${n.p} Projekte, ${n.k} Kunden aus der Buchhaltung · Geräte-ID ${cfg.geraet_id.slice(0, 8)} · App-Version ${APP_VERSION}`;
+  $('#datenInfo').textContent = `${n.e} Einträge, ${n.p} Projekte, ${n.k} Kunden aus der Buchhaltung`;
+  renderInfo();
 }
+
+async function renderInfo() {
+  let offline = 'nicht aktiv';
+  try {
+    const keys = 'caches' in window ? await caches.keys() : [];
+    const c = keys.find(k => k.startsWith('zeiterfassung-v'));
+    if (navigator.serviceWorker?.controller && c) offline = 'aktiv (Cache ' + c.replace('zeiterfassung-', '') + ')';
+  } catch { /* egal */ }
+  const zeilen = [
+    ['App-Version', `${APP_VERSION} (Stand ${APP_STAND})`],
+    ['Offline-Betrieb', offline],
+    ['Installiert als App', matchMedia('(display-mode: standalone)').matches ? 'ja' : 'nein (im Browser geöffnet)'],
+    ['Adresse', location.origin + location.pathname],
+    ['Gerät', `${cfg.geraet_name} · ID ${cfg.geraet_id.slice(0, 8)}`],
+    ['Letzter Abgleich', cfg.letzteSync ? new Date(cfg.letzteSync).toLocaleString('de-DE') : '–'],
+  ];
+  $('#infoListe').innerHTML = zeilen.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+}
+
+$('#updateBtn').addEventListener('click', async () => {
+  const info = $('#updateInfo');
+  info.textContent = 'Suche …';
+  try {
+    const t = await (await fetch('app.js?' + Date.now(), { cache: 'no-store' })).text();
+    const online = (t.match(/APP_VERSION = '([^']+)'/) || [])[1];
+    if (!online) throw new Error('Version online nicht lesbar.');
+    if (online === APP_VERSION) { info.textContent = `✓ Aktuell – Version ${APP_VERSION} ist die neueste.`; return; }
+    info.textContent = `Version ${online} verfügbar – wird geladen …`;
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg) await reg.update();          // neuer Service Worker übernimmt und lädt die Seite neu
+    setTimeout(() => location.reload(), 4000);
+  } catch (e) { info.textContent = '✗ ' + (navigator.onLine ? e.message : 'Offline – Update-Suche nicht möglich.'); }
+});
 $('#formAllg').addEventListener('change', e => { cfg.geraet_name = e.currentTarget.geraet_name.value.trim() || cfg.geraet_name; saveCfg(); planeSync(); });
 $('#formSync').addEventListener('change', e => {
   const f = e.currentTarget;
