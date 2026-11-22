@@ -9,7 +9,7 @@
  * Rechnungs-Entwurf in der Buchhaltung angelegt (POST /api/rechnungen).
  */
 'use strict';
-const APP_VERSION = '7';   // zusammen mit VERSION in sw.js erhöhen
+const APP_VERSION = '8';   // zusammen mit VERSION in sw.js erhöhen
 const APP_STAND = '22.11.2026';
 
 // ------------------------------------------------------------------ Hilfen
@@ -357,7 +357,7 @@ function renderErfassen() {
         <input id="tText" placeholder="Tätigkeit (optional)">
       </div>
       <button class="btn primary big" id="startBtn" type="button">▶ Starten</button>
-      ${zuletzt.length > 1 ? `<div class="recent">${zuletzt.map(p => `<button class="chip" type="button" data-start="${esc(p.id)}">▶ ${esc(p.name)}</button>`).join('')}</div>` : ''}`
+      ${zuletzt.length > 1 ? `<div class="recent">${zuletzt.map(p => `<button class="chip" type="button" data-start="${esc(p.id)}">▶ ${esc(p.name)}${p.kunde ? ' · ' + esc(p.kunde) : ''}</button>`).join('')}</div>` : ''}`
       : `<div class="empty">Lege zuerst ein Projekt an (mit Kunde und Stundensatz).<br><br>
          <button class="btn primary" type="button" id="ersteProjekt">+ Projekt anlegen</button></div>`;
     const start = (pid, text = '') => {
